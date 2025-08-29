@@ -9,5 +9,15 @@ wheels/
 # Virtual environments
 .venv
 
+# Application files
 logs/
 data/
+debug/
+*.db
+
+# Test/config files
+*test_config.json
+simple_test_config.json
+
+# Claude files
+.claude/
