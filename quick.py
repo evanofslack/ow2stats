@@ -73,7 +73,7 @@ def test_live_scraping():
 
     try:
         print("🔄 Attempting to scrape...")
-        stats = scraper._scrape_stats_page("PC", "Americas", "All")
+        stats = scraper._scrape_stats_page("PC", "Americas", "All", "Quick Play", "All")
 
         if stats:
             print(f"✅ SUCCESS! Found {len(stats)} heroes:")

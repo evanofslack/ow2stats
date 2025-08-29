@@ -17,11 +17,10 @@ import sys
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.common.exceptions import TimeoutException
 
 
 @dataclass
@@ -34,6 +33,8 @@ class HeroStats:
     region: str
     platform: str
     role: str
+    gamemode: str
+    map: str
     timestamp: str
 
 
@@ -62,7 +63,9 @@ class OverwatchScraper:
             ],
             "regions": ["Americas", "Europe", "Asia"],
             "platforms": ["PC", "Console"],
-            "roles": ["All", "Tank", "Damage", "Support"],
+            "roles": ["Tank", "Damage", "Support"],
+            "gamemodes": ["Quick Play", "Competitive"],
+            "maps": ["All"],
         }
 
         try:
@@ -119,15 +122,17 @@ class OverwatchScraper:
                     region TEXT NOT NULL,
                     platform TEXT NOT NULL,
                     role TEXT NOT NULL,
+                    gamemode TEXT NOT NULL,
+                    map TEXT NOT NULL,
                     timestamp TEXT NOT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(hero, region, platform, role, timestamp)
+                    UNIQUE(hero, region, platform, role, gamemode, map, timestamp)
                 )
             """)
 
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_hero_stats_lookup 
-                ON hero_stats(hero, region, platform, timestamp)
+                ON hero_stats(hero, region, platform, gamemode, map, timestamp)
             """)
 
             conn.commit()
@@ -200,14 +205,24 @@ class OverwatchScraper:
         except Exception as e:
             self.logger.debug(f"Could not monitor network requests: {e}")
 
-    def _build_url(self, platform: str, region: str, role: str) -> str:
+    def _build_url(
+        self, platform: str, region: str, role: str, gamemode: str, map_name: str
+    ) -> str:
         """Build URL with parameters."""
+        # Map gamemode to rq parameter
+        rq_value = "1" if gamemode.lower() == "competitive" else "0"
+
+        # Format map name for URL (replace spaces with hyphens, lowercase)
+        map_param = (
+            map_name.lower().replace(" ", "-") if map_name != "All" else "all-maps"
+        )
+
         params = {
             "input": platform,
-            "map": "all-maps",
+            "map": map_param,
             "region": region,
             "role": role,
-            "rq": "0",
+            "rq": rq_value,
             "tier": "All",
         }
 
@@ -296,7 +311,7 @@ class OverwatchScraper:
         """Parse hero statistics from page text since it's not in table format."""
         hero_data = []
 
-        # Common hero names to look for
+        # Updated hero names list including newer heroes
         hero_names = [
             "Ana",
             "Ashe",
@@ -307,6 +322,7 @@ class OverwatchScraper:
             "D.Va",
             "Doomfist",
             "Echo",
+            "Freja",  # New hero
             "Genji",
             "Hanzo",
             "Junkrat",
@@ -339,31 +355,50 @@ class OverwatchScraper:
 
         lines = page_text.split("\n")
 
-        # Look for patterns like "HeroName XX.X% YY.Y%"
+        # Save raw page text for debugging if enabled
+        if self.config.get("debug_mode", False):
+            debug_dir = Path("debug")
+            debug_dir.mkdir(exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            with open(debug_dir / f"page_text_{timestamp}.txt", "w", encoding="utf-8") as f:
+                f.write(page_text)
+            self.logger.debug(f"Saved raw page text to debug/page_text_{timestamp}.txt")
+
+        # The page structure is:
+        # HERO_NAME
+        # PICK_RATE%
+        # WIN_RATE%
+        # (repeat for each hero)
+        
         import re
+        percentage_pattern = re.compile(r"^(\d+(?:\.\d+)?)%$")
 
         for i, line in enumerate(lines):
             line = line.strip()
-
+            
             # Check if this line contains a hero name
             for hero in hero_names:
-                if hero.upper() in line.upper():
-                    # Look in this line and surrounding lines for percentages
-                    search_lines = lines[max(0, i - 2) : i + 3]  # Check nearby lines
-                    search_text = " ".join(search_lines)
-
-                    # Find percentages in the search area
-                    percentages = re.findall(r"(\d+\.?\d*)%", search_text)
-
-                    if len(percentages) >= 2:
-                        try:
-                            pick_rate = float(percentages[0])
-                            win_rate = float(percentages[1])
+                if line.upper() == hero.upper():
+                    # Found a hero name, look for percentages in the next 2 lines
+                    try:
+                        # Next line should be pick rate
+                        if i + 1 < len(lines):
+                            pick_line = lines[i + 1].strip()
+                            pick_match = percentage_pattern.match(pick_line)
+                            
+                        # Line after that should be win rate  
+                        if i + 2 < len(lines):
+                            win_line = lines[i + 2].strip()
+                            win_match = percentage_pattern.match(win_line)
+                            
+                        if pick_match and win_match:
+                            pick_rate = float(pick_match.group(1))
+                            win_rate = float(win_match.group(1))
 
                             hero_data.append(
                                 {
                                     "hero": hero,
-                                    "pick_rate": f"{pick_rate}%",
+                                    "pick_rate": f"{pick_rate}%", 
                                     "win_rate": f"{win_rate}%",
                                 }
                             )
@@ -371,10 +406,12 @@ class OverwatchScraper:
                             self.logger.debug(
                                 f"Found {hero}: {pick_rate}% pick, {win_rate}% win"
                             )
-                            break  # Found this hero, move to next line
-                        except (ValueError, IndexError):
-                            continue
+                            break  # Found this hero, don't check other hero names for this line
+                            
+                    except (ValueError, IndexError, AttributeError):
+                        continue
 
+        self.logger.info(f"Found {len(hero_data)} heroes out of {len(hero_names)} possible heroes")
         return hero_data
 
     def _extract_hero_data(self, hero_dict: Dict) -> Optional[Dict]:
@@ -382,11 +419,13 @@ class OverwatchScraper:
         return hero_dict  # Already in the right format
 
     def _scrape_stats_page(
-        self, platform: str, region: str, role: str
+        self, platform: str, region: str, role: str, gamemode: str, map_name: str
     ) -> List[HeroStats]:
         """Scrape statistics for a specific configuration."""
-        url = self._build_url(platform, region, role)
-        self.logger.info(f"Scraping {platform}/{region}/{role}: {url}")
+        url = self._build_url(platform, region, role, gamemode, map_name)
+        self.logger.info(
+            f"Scraping {platform}/{region}/{role}/{gamemode}/{map_name}: {url}"
+        )
 
         driver = None
         try:
@@ -452,6 +491,8 @@ class OverwatchScraper:
                             region=region,
                             platform=platform,
                             role=role,
+                            gamemode=gamemode,
+                            map=map_name,
                             timestamp=timestamp,
                         )
                     )
@@ -462,7 +503,7 @@ class OverwatchScraper:
                     continue
 
             self.logger.info(
-                f"Extracted {len(stats)} hero stats for {platform}/{region}/{role}"
+                f"Extracted {len(stats)} hero stats for {platform}/{region}/{role}/{gamemode}/{map_name}"
             )
             return stats
 
@@ -489,8 +530,8 @@ class OverwatchScraper:
                     cursor.execute(
                         """
                         INSERT OR REPLACE INTO hero_stats 
-                        (hero, pick_rate, win_rate, region, platform, role, timestamp)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        (hero, pick_rate, win_rate, region, platform, role, gamemode, map, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             stats.hero,
@@ -499,6 +540,8 @@ class OverwatchScraper:
                             stats.region,
                             stats.platform,
                             stats.role,
+                            stats.gamemode,
+                            stats.map,
                             stats.timestamp,
                         ),
                     )
@@ -509,11 +552,13 @@ class OverwatchScraper:
             self.logger.info(f"Saved {len(stats_list)} hero statistics to database")
 
     def scrape_all_configurations(self) -> None:
-        """Scrape all platform/region/role combinations."""
+        """Scrape all platform/region/role/gamemode/map combinations."""
         total_combinations = (
             len(self.config["platforms"])
             * len(self.config["regions"])
             * len(self.config["roles"])
+            * len(self.config["gamemodes"])
+            * len(self.config["maps"])
         )
         self.logger.info(f"Starting scrape for {total_combinations} configurations")
 
@@ -523,25 +568,29 @@ class OverwatchScraper:
         for platform in self.config["platforms"]:
             for region in self.config["regions"]:
                 for role in self.config["roles"]:
-                    for attempt in range(self.config["retry_attempts"]):
-                        try:
-                            stats = self._scrape_stats_page(platform, region, role)
-                            self._save_stats(stats)
-                            completed += 1
-                            break
+                    for gamemode in self.config["gamemodes"]:
+                        for map_name in self.config["maps"]:
+                            for attempt in range(self.config["retry_attempts"]):
+                                try:
+                                    stats = self._scrape_stats_page(
+                                        platform, region, role, gamemode, map_name
+                                    )
+                                    self._save_stats(stats)
+                                    completed += 1
+                                    break
 
-                        except Exception as e:
-                            self.logger.warning(
-                                f"Attempt {attempt + 1} failed for {platform}/{region}/{role}: {e}"
-                            )
-                            if attempt < self.config["retry_attempts"] - 1:
-                                time.sleep(self.config["retry_delay"])
-                            else:
-                                failed += 1
+                                except Exception as e:
+                                    self.logger.warning(
+                                        f"Attempt {attempt + 1} failed for {platform}/{region}/{role}/{gamemode}/{map_name}: {e}"
+                                    )
+                                    if attempt < self.config["retry_attempts"] - 1:
+                                        time.sleep(self.config["retry_delay"])
+                                    else:
+                                        failed += 1
 
-                    # Rate limiting between requests
-                    delay = random.uniform(*self.config["rate_limit_delay"])
-                    time.sleep(delay)
+                            # Rate limiting between requests
+                            delay = random.uniform(*self.config["rate_limit_delay"])
+                            time.sleep(delay)
 
         self.logger.info(f"Scraping completed. Success: {completed}, Failed: {failed}")
 
@@ -572,7 +621,7 @@ def main():
         scraper.scrape_all_configurations()
 
         # Show recent results
-        recent_stats = scraper.get_latest_stats(10)
+        recent_stats = scraper.get_latest_stats(20)
         scraper.logger.info(f"Recent stats count: {len(recent_stats)}")
 
     except KeyboardInterrupt:

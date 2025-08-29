@@ -14,5 +14,7 @@
   "regions": ["Americas", "Europe", "Asia"],
   "platforms": ["PC", "Console"],
   "roles": ["All", "Tank", "Damage", "Support"],
+  "gamemodes": ["Quick Play", "Competitive"],
+  "maps": ["All", "Hanamura", "Temple of Anubis", "Antarctic Peninsula", "Blizzard World", "Eichenwalde", "Numbani"],
   "log_level": "INFO"
 }
