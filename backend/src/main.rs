@@ -1,8 +1,4 @@
-use axum::{
-    response::Json,
-    routing::{get},
-    Router,
-};
+use axum::{response::Json, routing::get, Router};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -76,4 +72,3 @@ async fn health_check() -> Result<Json<Value>, AppError> {
         "timestamp": chrono::Utc::now()
     })))
 }
-

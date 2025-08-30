@@ -25,7 +25,8 @@ fn default_log_level() -> String {
 impl Config {
     pub fn load() -> anyhow::Result<Self> {
         dotenvy::dotenv().ok();
-        let config = envy::from_env::<Config>()?;
+        let config = envy::prefixed("OW2STATS_").from_env::<Config>()?;
         Ok(config)
     }
 }
+
