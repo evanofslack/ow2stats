@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 import random
 import sys
 
@@ -468,8 +468,7 @@ class OverwatchScraper:
         if not stats_list:
             return
 
-        stats_as_dicts = [asdict(stat) for stat in stats_list]
-        self.client.upload_stats(stats_as_dicts)
+        self.client.upload_stats(stats_list)
 
     def scrape_all_configurations(self) -> None:
         """Scrape all platform/region/role/gamemode/map combinations."""
