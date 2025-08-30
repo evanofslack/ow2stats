@@ -1,17 +1,10 @@
-#!/usr/bin/env python3
-"""
-Overwatch Statistics Scraper
-Production-ready scraper for hero statistics with logging and error handling.
-"""
-
 import logging
 import json
-import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import random
 import sys
 
@@ -21,6 +14,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+
+from client import BackendClient
 
 
 @dataclass
@@ -44,8 +39,9 @@ class OverwatchScraper:
     def __init__(self, config_path: str = "config.json"):
         self.config = self._load_config(config_path)
         self.logger = self._setup_logging()
-        self.db_path = Path(self.config.get("db_path", "overwatch_stats.db"))
-        self._setup_database()
+        self.backend_url = self.config.get("backend_url")
+        self.client = BackendClient(self.backend_url)
+        self.saveHtml = False
 
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from JSON file."""
@@ -106,36 +102,6 @@ class OverwatchScraper:
             logger.addHandler(file_handler)
 
         return logger
-
-    def _setup_database(self) -> None:
-        """Initialize SQLite database with proper schema."""
-        self.logger.info(f"Setting up database at {self.db_path}")
-
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS hero_stats (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    hero TEXT NOT NULL,
-                    pick_rate REAL,
-                    win_rate REAL,
-                    region TEXT NOT NULL,
-                    platform TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    gamemode TEXT NOT NULL,
-                    map TEXT NOT NULL,
-                    timestamp TEXT NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(hero, region, platform, role, gamemode, map, timestamp)
-                )
-            """)
-
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_hero_stats_lookup 
-                ON hero_stats(hero, region, platform, gamemode, map, timestamp)
-            """)
-
-            conn.commit()
 
     def _create_driver(self) -> webdriver.Chrome:
         """Create Chrome WebDriver with production settings."""
@@ -322,15 +288,19 @@ class OverwatchScraper:
             "D.Va",
             "Doomfist",
             "Echo",
-            "Freja",  # New hero
+            "Freja",
             "Genji",
             "Hanzo",
+            "Hazard",
             "Junkrat",
+            "Illari",
+            "Junker Queen",
+            "Junkrat",
+            "Juno",
             "Kiriko",
             "Lifeweaver",
             "Lucio",
             "Mauga",
-            "McCree",
             "Mei",
             "Mercy",
             "Moira",
@@ -341,14 +311,17 @@ class OverwatchScraper:
             "Reinhardt",
             "Roadhog",
             "Sigma",
+            "Sojourn",
             "Soldier: 76",
             "Sombra",
             "Symmetra",
             "Torbjorn",
             "Tracer",
+            "Venture",
             "Widowmaker",
             "Winston",
             "Wrecking Ball",
+            "Wuyang",
             "Zarya",
             "Zenyatta",
         ]
@@ -360,7 +333,9 @@ class OverwatchScraper:
             debug_dir = Path("debug")
             debug_dir.mkdir(exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            with open(debug_dir / f"page_text_{timestamp}.txt", "w", encoding="utf-8") as f:
+            with open(
+                debug_dir / f"page_text_{timestamp}.txt", "w", encoding="utf-8"
+            ) as f:
                 f.write(page_text)
             self.logger.debug(f"Saved raw page text to debug/page_text_{timestamp}.txt")
 
@@ -369,13 +344,14 @@ class OverwatchScraper:
         # PICK_RATE%
         # WIN_RATE%
         # (repeat for each hero)
-        
+
         import re
+
         percentage_pattern = re.compile(r"^(\d+(?:\.\d+)?)%$")
 
         for i, line in enumerate(lines):
             line = line.strip()
-            
+
             # Check if this line contains a hero name
             for hero in hero_names:
                 if line.upper() == hero.upper():
@@ -385,12 +361,12 @@ class OverwatchScraper:
                         if i + 1 < len(lines):
                             pick_line = lines[i + 1].strip()
                             pick_match = percentage_pattern.match(pick_line)
-                            
-                        # Line after that should be win rate  
+
+                        # Line after that should be win rate
                         if i + 2 < len(lines):
                             win_line = lines[i + 2].strip()
                             win_match = percentage_pattern.match(win_line)
-                            
+
                         if pick_match and win_match:
                             pick_rate = float(pick_match.group(1))
                             win_rate = float(win_match.group(1))
@@ -398,7 +374,7 @@ class OverwatchScraper:
                             hero_data.append(
                                 {
                                     "hero": hero,
-                                    "pick_rate": f"{pick_rate}%", 
+                                    "pick_rate": f"{pick_rate}%",
                                     "win_rate": f"{win_rate}%",
                                 }
                             )
@@ -407,11 +383,13 @@ class OverwatchScraper:
                                 f"Found {hero}: {pick_rate}% pick, {win_rate}% win"
                             )
                             break  # Found this hero, don't check other hero names for this line
-                            
+
                     except (ValueError, IndexError, AttributeError):
                         continue
 
-        self.logger.info(f"Found {len(hero_data)} heroes out of {len(hero_names)} possible heroes")
+        self.logger.info(
+            f"Found {len(hero_data)} heroes out of {len(hero_names)} possible heroes"
+        )
         return hero_data
 
     def _extract_hero_data(self, hero_dict: Dict) -> Optional[Dict]:
@@ -438,17 +416,18 @@ class OverwatchScraper:
                 self.logger.error(f"Page failed to load properly: {url}")
 
                 # Debug: Save page source
-                debug_dir = Path("debug")
-                debug_dir.mkdir(exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                with open(
-                    debug_dir
-                    / f"page_source_{platform}_{region}_{role}_{timestamp}.html",
-                    "w",
-                    encoding="utf-8",
-                ) as f:
-                    f.write(driver.page_source)
-                self.logger.info(f"Saved page source to debug/ folder")
+                if self.saveHtml:
+                    debug_dir = Path("debug")
+                    debug_dir.mkdir(exist_ok=True)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    with open(
+                        debug_dir
+                        / f"page_source_{platform}_{region}_{role}_{timestamp}.html",
+                        "w",
+                        encoding="utf-8",
+                    ) as f:
+                        f.write(driver.page_source)
+                    self.logger.info("Saved page source to debug/ folder")
 
                 return []
 
@@ -518,38 +497,12 @@ class OverwatchScraper:
                 driver.quit()
 
     def _save_stats(self, stats_list: List[HeroStats]) -> None:
-        """Save statistics to database."""
+        """Save statistics to backend."""
         if not stats_list:
             return
 
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-
-            for stats in stats_list:
-                try:
-                    cursor.execute(
-                        """
-                        INSERT OR REPLACE INTO hero_stats 
-                        (hero, pick_rate, win_rate, region, platform, role, gamemode, map, timestamp)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                        (
-                            stats.hero,
-                            stats.pick_rate,
-                            stats.win_rate,
-                            stats.region,
-                            stats.platform,
-                            stats.role,
-                            stats.gamemode,
-                            stats.map,
-                            stats.timestamp,
-                        ),
-                    )
-                except Exception as e:
-                    self.logger.error(f"Error saving stats for {stats.hero}: {e}")
-
-            conn.commit()
-            self.logger.info(f"Saved {len(stats_list)} hero statistics to database")
+        stats_as_dicts = [asdict(stat) for stat in stats_list]
+        self.client.upload_stats(stats_as_dicts)
 
     def scrape_all_configurations(self) -> None:
         """Scrape all platform/region/role/gamemode/map combinations."""
@@ -590,26 +543,10 @@ class OverwatchScraper:
 
                             # Rate limiting between requests
                             delay = random.uniform(*self.config["rate_limit_delay"])
+                            self.logger.debug(f"Sleeping for {delay}...")
                             time.sleep(delay)
 
         self.logger.info(f"Scraping completed. Success: {completed}, Failed: {failed}")
-
-    def get_latest_stats(self, limit: int = 100) -> List[Dict]:
-        """Get latest statistics from database."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                SELECT * FROM hero_stats 
-                ORDER BY created_at DESC 
-                LIMIT ?
-            """,
-                (limit,),
-            )
-
-            return [dict(row) for row in cursor.fetchall()]
 
 
 def main():
