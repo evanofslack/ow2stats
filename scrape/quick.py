@@ -3,8 +3,6 @@
 Test the updated scraper with text parsing
 """
 
-import sys
-from pathlib import Path
 from scrape import OverwatchScraper
 
 

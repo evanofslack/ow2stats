@@ -1,4 +1,5 @@
 import logging
+from config import config
 import json
 import time
 from datetime import datetime
@@ -36,44 +37,10 @@ class HeroStats:
 class OverwatchScraper:
     """Production-ready Overwatch statistics scraper."""
 
-    def __init__(self, config_path: str = "config.json"):
-        self.config = self._load_config(config_path)
+    def __init__(self):
+        self.config = config
         self.logger = self._setup_logging()
-        self.backend_url = self.config.get("backend_url")
-        self.client = BackendClient(self.backend_url)
-        self.saveHtml = False
-
-    def _load_config(self, config_path: str) -> Dict:
-        """Load configuration from JSON file."""
-        default_config = {
-            "base_url": "https://overwatch.blizzard.com/en-us/rates/",
-            "timeout": 15,
-            "retry_attempts": 3,
-            "retry_delay": 5,
-            "rate_limit_delay": (2, 5),
-            "headless": True,
-            "user_agents": [
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-            ],
-            "regions": ["Americas", "Europe", "Asia"],
-            "platforms": ["PC", "Console"],
-            "roles": ["Tank", "Damage", "Support"],
-            "gamemodes": ["Quick Play", "Competitive"],
-            "maps": ["All"],
-        }
-
-        try:
-            config_file = Path(config_path)
-            if config_file.exists():
-                with open(config_file, "r") as f:
-                    user_config = json.load(f)
-                default_config.update(user_config)
-        except Exception as e:
-            print(f"Warning: Could not load config file: {e}")
-
-        return default_config
+        self.client = BackendClient(self.config.backend_url)
 
     def _setup_logging(self) -> logging.Logger:
         """Setup structured logging."""
@@ -107,7 +74,7 @@ class OverwatchScraper:
         """Create Chrome WebDriver with production settings."""
         options = Options()
 
-        if self.config.get("headless", True):
+        if self.config.headless:
             options.add_argument("--headless")
 
         # Security and performance options
@@ -125,11 +92,11 @@ class OverwatchScraper:
         options.add_argument("--disable-blink-features=AutomationControlled")
 
         # Set logging preferences for network monitoring
-        if self.config.get("debug_mode", False):
+        if self.config.debug_mode:
             options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
         # Random user agent
-        user_agent = random.choice(self.config["user_agents"])
+        user_agent = random.choice(self.config.user_agents)
         options.add_argument(f"--user-agent={user_agent}")
 
         try:
@@ -139,7 +106,7 @@ class OverwatchScraper:
             )
 
             # Set longer page load timeout
-            driver.set_page_load_timeout(self.config.get("page_load_timeout", 30))
+            driver.set_page_load_timeout(self.config.timeout)
 
             return driver
         except Exception as e:
@@ -148,7 +115,7 @@ class OverwatchScraper:
 
     def _monitor_network_requests(self, driver: webdriver.Chrome) -> None:
         """Monitor network requests to find API endpoints."""
-        if not self.config.get("debug_mode", False):
+        if not self.config.debug_mode:
             return
 
         try:
@@ -193,7 +160,7 @@ class OverwatchScraper:
         }
 
         param_string = "&".join([f"{k}={v}" for k, v in params.items()])
-        return f"{self.config['base_url']}?{param_string}"
+        return f"{self.config.base_url}?{param_string}"
 
     def _parse_percentage(self, value: str) -> Optional[float]:
         """Parse percentage string to float."""
@@ -210,7 +177,7 @@ class OverwatchScraper:
 
     def _wait_for_page_load(self, driver: webdriver.Chrome) -> bool:
         """Wait for the page to fully load with multiple fallback strategies."""
-        wait = WebDriverWait(driver, self.config["timeout"])
+        wait = WebDriverWait(driver, self.config.timeout)
 
         # Strategy 1: Wait for hero statistics content to appear
         try:
@@ -329,7 +296,7 @@ class OverwatchScraper:
         lines = page_text.split("\n")
 
         # Save raw page text for debugging if enabled
-        if self.config.get("debug_mode", False):
+        if self.config.debug_mode:
             debug_dir = Path("debug")
             debug_dir.mkdir(exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -416,7 +383,7 @@ class OverwatchScraper:
                 self.logger.error(f"Page failed to load properly: {url}")
 
                 # Debug: Save page source
-                if self.saveHtml:
+                if self.config.save_html:
                     debug_dir = Path("debug")
                     debug_dir.mkdir(exist_ok=True)
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -507,23 +474,23 @@ class OverwatchScraper:
     def scrape_all_configurations(self) -> None:
         """Scrape all platform/region/role/gamemode/map combinations."""
         total_combinations = (
-            len(self.config["platforms"])
-            * len(self.config["regions"])
-            * len(self.config["roles"])
-            * len(self.config["gamemodes"])
-            * len(self.config["maps"])
+            len(self.config.platforms)
+            * len(self.config.regions)
+            * len(self.config.roles)
+            * len(self.config.gamemodes)
+            * len(self.config.maps)
         )
         self.logger.info(f"Starting scrape for {total_combinations} configurations")
 
         completed = 0
         failed = 0
 
-        for platform in self.config["platforms"]:
-            for region in self.config["regions"]:
-                for role in self.config["roles"]:
-                    for gamemode in self.config["gamemodes"]:
-                        for map_name in self.config["maps"]:
-                            for attempt in range(self.config["retry_attempts"]):
+        for platform in self.config.platforms:
+            for region in self.config.regions:
+                for role in self.config.roles:
+                    for gamemode in self.config.gamemodes:
+                        for map_name in self.config.maps:
+                            for attempt in range(self.config.retry_attempts):
                                 try:
                                     stats = self._scrape_stats_page(
                                         platform, region, role, gamemode, map_name
@@ -536,13 +503,13 @@ class OverwatchScraper:
                                     self.logger.warning(
                                         f"Attempt {attempt + 1} failed for {platform}/{region}/{role}/{gamemode}/{map_name}: {e}"
                                     )
-                                    if attempt < self.config["retry_attempts"] - 1:
-                                        time.sleep(self.config["retry_delay"])
+                                    if attempt < self.config.retry_attempts - 1:
+                                        time.sleep(self.config.retry_delay)
                                     else:
                                         failed += 1
 
                             # Rate limiting between requests
-                            delay = random.uniform(*self.config["rate_limit_delay"])
+                            delay = random.uniform(*self.config.rate_limit_delay)
                             self.logger.debug(f"Sleeping for {delay}...")
                             time.sleep(delay)
 
@@ -552,15 +519,9 @@ class OverwatchScraper:
 def main():
     """Main execution function."""
     scraper = OverwatchScraper()
-
     try:
         scraper.logger.info("Starting Overwatch statistics scraping")
         scraper.scrape_all_configurations()
-
-        # Show recent results
-        recent_stats = scraper.get_latest_stats(20)
-        scraper.logger.info(f"Recent stats count: {len(recent_stats)}")
-
     except KeyboardInterrupt:
         scraper.logger.info("Scraping interrupted by user")
     except Exception as e:

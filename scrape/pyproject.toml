@@ -8,6 +8,8 @@ dependencies = [
     "selenium>=4.35.0",
     "webdriver-manager>=4.0.2",
     "requests>=2.31.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
 ]
 
 [dependency-groups]
