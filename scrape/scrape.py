@@ -1,5 +1,4 @@
 import logging
-from .config import config
 import json
 import time
 from datetime import datetime
@@ -8,6 +7,7 @@ from typing import Dict, List, Optional
 from .models import HeroStats
 import random
 import sys
+import re
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -17,8 +17,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
 from .client import BackendClient
-
-
+from .config import config
 
 
 class OverwatchScraper:
@@ -163,59 +162,28 @@ class OverwatchScraper:
             return None
 
     def _wait_for_page_load(self, driver: webdriver.Chrome) -> bool:
-        """Wait for the page to fully load with multiple fallback strategies."""
-        wait = WebDriverWait(driver, self.config.timeout)
-
-        # Strategy 1: Wait for hero statistics content to appear
+        """Waits for a specific, reliable element to be present on the page."""
         try:
-            # Look for the page to contain hero names and percentages
-            def content_loaded(driver):
-                body_text = driver.find_element(By.TAG_NAME, "body").text
-                # Check for both hero names and percentage symbols
-                has_heroes = any(
-                    hero in body_text
-                    for hero in ["Genji", "Tracer", "Mercy", "Reinhardt", "Hanzo"]
-                )
-                has_percentages = "%" in body_text
-                has_stats_header = "HERO STATISTICS" in body_text
-                return has_heroes and has_percentages and has_stats_header
+            wait = WebDriverWait(driver, self.config.timeout)
+            # This selector was identified as the most reliable and efficient
+            # sentinel for when the hero data has loaded.
+            sentinel_selector = "[class*='hero']"
 
-            wait.until(content_loaded)
-            self.logger.debug("Page loaded - found heroes and percentages")
-            return True
-        except TimeoutException:
-            pass
-
-        # Strategy 2: Wait for specific UI elements
-        ui_selectors = [
-            "[role='main']",
-            ".hero-stats",
-            "[data-testid]",
-            "[class*='hero']",
-            "[class*='stat']",
-            "main",
-        ]
-
-        for selector in ui_selectors:
-            try:
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-                self.logger.debug(f"Found UI element: {selector}")
-                time.sleep(2)  # Additional wait for content to populate
-                return True
-            except TimeoutException:
-                continue
-
-        # Strategy 3: Wait for page to stop loading and settle
-        try:
+            self.logger.debug(f"Waiting for sentinel element: {sentinel_selector}")
             wait.until(
-                lambda d: d.execute_script("return document.readyState") == "complete"
+                EC.presence_of_element_located((By.CSS_SELECTOR, sentinel_selector))
             )
-            time.sleep(5)  # Wait for JS to render content
-            return True
-        except TimeoutException:
-            pass
+            self.logger.info("Sentinel element found. Page is loaded.")
 
-        return False
+            # A very brief pause to ensure all JS has finished rendering after the element appears.
+            time.sleep(0.5)
+            return True
+
+        except TimeoutException:
+            self.logger.error(
+                "Timed out waiting for the sentinel element. Page may not have loaded correctly."
+            )
+            return False
 
     def _find_data_rows(self, driver: webdriver.Chrome) -> List:
         """Find hero data using text parsing since no tables exist."""
@@ -231,7 +199,6 @@ class OverwatchScraper:
         """Parse hero statistics from page text since it's not in table format."""
         hero_data = []
 
-        # Updated hero names list including newer heroes
         hero_names = [
             "Ana",
             "Ashe",
@@ -298,8 +265,6 @@ class OverwatchScraper:
         # PICK_RATE%
         # WIN_RATE%
         # (repeat for each hero)
-
-        import re
 
         percentage_pattern = re.compile(r"^(\d+(?:\.\d+)?)%$")
 

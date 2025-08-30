@@ -2,7 +2,6 @@ import pytest
 from typing import List
 from scrape.scrape import OverwatchScraper
 from scrape.models import HeroStats
-from scrape.client import BackendClient
 
 @pytest.fixture
 def scraper() -> OverwatchScraper:
