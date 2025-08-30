@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: ow2stats-postgres
+    environment:
+      POSTGRES_DB: ow2stats
+      POSTGRES_USER: ow2stats
+      POSTGRES_PASSWORD: ow2stats_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ow2stats -d ow2stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: ow2stats-backend
+    environment:
+      OW2STATS_DATABASE_URL: "postgresql://ow2stats:ow2stats_password@postgres:5432/ow2stats"
+      OW2STATS_PORT: 3000
+      OW2STATS_LOG_LEVEL: "info"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scraper:
+    build: ./scrape
+    container_name: ow2stats-scraper
+    environment:
+      OW_BACKEND_URL: "http://backend:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  postgres_data:
