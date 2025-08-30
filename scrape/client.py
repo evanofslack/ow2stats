@@ -2,7 +2,7 @@ import requests
 from typing import List
 from dataclasses import asdict
 
-from scrape import HeroStats
+from .models import HeroStats
 
 
 class BackendClient:

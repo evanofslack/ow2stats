@@ -1,11 +1,11 @@
 import logging
-from config import config
+from .config import config
 import json
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
-from dataclasses import dataclass
+from .models import HeroStats
 import random
 import sys
 
@@ -16,22 +16,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
-from client import BackendClient
+from .client import BackendClient
 
 
-@dataclass
-class HeroStats:
-    """Data class for hero statistics."""
-
-    hero: str
-    pick_rate: Optional[float]
-    win_rate: Optional[float]
-    region: str
-    platform: str
-    role: str
-    gamemode: str
-    map: str
-    timestamp: str
 
 
 class OverwatchScraper:
