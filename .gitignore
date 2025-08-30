@@ -1,23 +1,15 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
-# Application files
-logs/
-data/
-debug/
-*.db
-
-# Test/config files
-*test_config.json
-simple_test_config.json
-
-# Claude files
+# Claude Code
 .claude/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# Local environment files
+.env
+.env.*
+!/.env.example
