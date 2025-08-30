@@ -39,8 +39,8 @@ pub async fn create_hero(
 
     let hero = sqlx::query_as::<_, HeroStats>(
         r#"
-        INSERT INTO hero_stats (hero, pick_rate, win_rate, region, platform, role, gamemode, map, timestamp)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO hero_stats (hero, pick_rate, win_rate, region, platform, role, gamemode, map, tier, timestamp)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
         "#,
     )
@@ -52,6 +52,7 @@ pub async fn create_hero(
     .bind(&hero_data.role)
     .bind(&hero_data.gamemode)
     .bind(&hero_data.map)
+    .bind(&hero_data.tier)
     .bind(hero_data.timestamp)
     .fetch_one(state.db.pool())
     .await?;
@@ -100,9 +101,9 @@ pub async fn batch_upload(
     for (index, hero_data) in heroes_data.iter().enumerate() {
         let result = sqlx::query(
             r#"
-            INSERT INTO hero_stats (hero, pick_rate, win_rate, region, platform, role, gamemode, map, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (hero, region, platform, role, gamemode, map, timestamp) 
+            INSERT INTO hero_stats (hero, pick_rate, win_rate, region, platform, role, gamemode, map, tier, timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT (hero, region, platform, role, gamemode, map, tier, timestamp) 
             DO UPDATE SET 
                 pick_rate = EXCLUDED.pick_rate,
                 win_rate = EXCLUDED.win_rate
@@ -116,6 +117,7 @@ pub async fn batch_upload(
         .bind(&hero_data.role)
         .bind(&hero_data.gamemode)
         .bind(&hero_data.map)
+        .bind(&hero_data.tier)
         .bind(hero_data.timestamp)
         .execute(&mut *transaction)
         .await;

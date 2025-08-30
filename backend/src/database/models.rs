@@ -13,6 +13,7 @@ pub struct HeroStats {
     pub role: String,
     pub gamemode: String,
     pub map: String,
+    pub tier: String,
     pub timestamp: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
 }
@@ -27,6 +28,7 @@ pub struct CreateHeroStats {
     pub role: String,
     pub gamemode: String,
     pub map: String,
+    pub tier: String,
     pub timestamp: DateTime<Utc>,
 }
 
@@ -40,6 +42,7 @@ pub struct UpdateHeroStats {
     pub role: Option<String>,
     pub gamemode: Option<String>,
     pub map: Option<String>,
+    pub tier: Option<String>,
     pub timestamp: Option<DateTime<Utc>>,
 }
 
@@ -51,6 +54,7 @@ pub struct HeroStatsQuery {
     pub role: Option<String>,
     pub gamemode: Option<String>,
     pub map: Option<String>,
+    pub tier: Option<String>,
     pub limit: Option<i32>,
     pub offset: Option<i32>,
 }
@@ -64,6 +68,7 @@ impl Default for HeroStatsQuery {
             role: None,
             gamemode: None,
             map: None,
+            tier: None,
             limit: Some(100),
             offset: Some(0),
         }

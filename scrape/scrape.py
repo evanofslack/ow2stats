@@ -125,13 +125,10 @@ class OverwatchScraper:
             self.logger.debug(f"Could not monitor network requests: {e}")
 
     def _build_url(
-        self, platform: str, region: str, role: str, gamemode: str, map_name: str
+        self, platform: str, region: str, role: str, gamemode: str, map_name: str, tier: str
     ) -> str:
         """Build URL with parameters."""
-        # Map gamemode to rq parameter
         rq_value = "1" if gamemode.lower() == "competitive" else "0"
-
-        # Format map name for URL (replace spaces with hyphens, lowercase)
         map_param = (
             map_name.lower().replace(" ", "-") if map_name != "All" else "all-maps"
         )
@@ -142,7 +139,7 @@ class OverwatchScraper:
             "region": region,
             "role": role,
             "rq": rq_value,
-            "tier": "All",
+            "tier": tier,
         }
 
         param_string = "&".join([f"{k}={v}" for k, v in params.items()])
@@ -316,10 +313,10 @@ class OverwatchScraper:
         return hero_dict  # Already in the right format
 
     def _scrape_stats_page(
-        self, platform: str, region: str, role: str, gamemode: str, map_name: str
+        self, platform: str, region: str, role: str, gamemode: str, map_name: str, tier: str
     ) -> List[HeroStats]:
         """Scrape statistics for a specific configuration."""
-        url = self._build_url(platform, region, role, gamemode, map_name)
+        url = self._build_url(platform, region, role, gamemode, map_name, tier)
         self.logger.info(
             f"Scraping {platform}/{region}/{role}/{gamemode}/{map_name}: {url}"
         )
@@ -391,6 +388,7 @@ class OverwatchScraper:
                             role=role,
                             gamemode=gamemode,
                             map=map_name,
+                            tier=tier,
                             timestamp=timestamp,
                         )
                     )
@@ -430,6 +428,7 @@ class OverwatchScraper:
             * len(self.config.roles)
             * len(self.config.gamemodes)
             * len(self.config.maps)
+            * len(self.config.tiers)
         )
         self.logger.info(f"Starting scrape for {total_combinations} configurations")
 
@@ -440,29 +439,31 @@ class OverwatchScraper:
             for region in self.config.regions:
                 for role in self.config.roles:
                     for gamemode in self.config.gamemodes:
-                        for map_name in self.config.maps:
-                            for attempt in range(self.config.retry_attempts):
-                                try:
-                                    stats = self._scrape_stats_page(
-                                        platform, region, role, gamemode, map_name
-                                    )
-                                    self._save_stats(stats)
-                                    completed += 1
-                                    break
+                        tiers_to_scrape = self.config.tiers if gamemode == "Competitive" else ["N/A"]
+                        for tier in tiers_to_scrape:
+                            for map_name in self.config.maps:
+                                for attempt in range(self.config.retry_attempts):
+                                    try:
+                                        stats = self._scrape_stats_page(
+                                            platform, region, role, gamemode, map_name, tier
+                                        )
+                                        self._save_stats(stats)
+                                        completed += 1
+                                        break
 
-                                except Exception as e:
-                                    self.logger.warning(
-                                        f"Attempt {attempt + 1} failed for {platform}/{region}/{role}/{gamemode}/{map_name}: {e}"
-                                    )
-                                    if attempt < self.config.retry_attempts - 1:
-                                        time.sleep(self.config.retry_delay)
-                                    else:
-                                        failed += 1
+                                    except Exception as e:
+                                        self.logger.warning(
+                                            f"Attempt {attempt + 1} failed for {platform}/{region}/{role}/{gamemode}/{map_name}/{tier}: {e}"
+                                        )
+                                        if attempt < self.config.retry_attempts - 1:
+                                            time.sleep(self.config.retry_delay)
+                                        else:
+                                            failed += 1
 
-                            # Rate limiting between requests
-                            delay = random.uniform(*self.config.rate_limit_delay)
-                            self.logger.debug(f"Sleeping for {delay}...")
-                            time.sleep(delay)
+                                # Rate limiting between requests
+                                delay = random.uniform(*self.config.rate_limit_delay)
+                                self.logger.debug(f"Sleeping for {delay}...")
+                                time.sleep(delay)
 
         self.logger.info(f"Scraping completed. Success: {completed}, Failed: {failed}")
 

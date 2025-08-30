@@ -13,4 +13,5 @@ class HeroStats:
     role: str
     gamemode: str
     map: str
+    tier: str
     timestamp: str
