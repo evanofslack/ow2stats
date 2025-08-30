@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     retry_delay: int = 2
     rate_limit_delay: Tuple[int, int] = (2, 5)
     headless: bool = True
+    log_level: str = "INFO"
+    debug_mode: bool = False
+    save_html: bool = False
     user_agents: List[str] = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -28,12 +31,55 @@ class Settings(BaseSettings):
     ]
     regions: List[str] = ["Americas", "Europe", "Asia"]
     platforms: List[str] = ["PC", "Console"]
-    roles: List[str] = ["All", "Tank", "Damage", "Support"]
+    roles: List[str] = ["All"]
     gamemodes: List[str] = ["Quick Play", "Competitive"]
-    maps: List[str] = ["All"]
-    log_level: str = "INFO"
-    debug_mode: bool = False
-    save_html: bool = False
+    # maps: List[str] = ["All"]
+
+    maps: List[str] = [
+        "All",
+        "Antarctic Peninsula",
+        "Busan",
+        "Ilios",
+        "Lijiang Tower",
+        "Nepal",
+        "Oasis",
+        "Samoa",
+        "Circuit Royal",
+        "Dorado",
+        "Havana",
+        "Junkertown",
+        "Rialto",
+        "Route 66",
+        "Shambali Monastery",
+        "Watchpoint: Gibraltar",
+        "Aatlis",
+        "New Junk City",
+        "Suravasa",
+        "Blizzard World",
+        "Eichenwalde",
+        "Hollywood",
+        "King's Row",
+        "Midtown",
+        "Numbani",
+        "Paraíso",
+        "Colosseo",
+        "Esperança",
+        "New Queen Street",
+        "Runasapi",
+        "Hanaoka",
+        "Temple of Anubis",
+    ]
+    tiers: List[str] = [
+        "All",
+        "Bronze",
+        "Silver",
+        "Gold",
+        "Platinum",
+        "Diamond",
+        "Master",
+        "Grandmaster",
+        "Champion",
+    ]
 
 
 def load_config() -> Settings:
