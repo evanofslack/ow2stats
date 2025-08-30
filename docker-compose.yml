@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgres:15
     container_name: ow2stats-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ow2stats
       POSTGRES_USER: ow2stats
@@ -31,6 +32,11 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   scraper:
     build: ./scrape
@@ -40,7 +46,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    restart: on-failure
+    restart: unless-stopped
+    volumes:
+      - ./scrape/config.json:/app/config.json
 
 volumes:
   postgres_data:
