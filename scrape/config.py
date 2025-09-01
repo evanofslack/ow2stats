@@ -14,7 +14,7 @@ class Settings(BaseSettings):
         env_prefix="OW_",
     )
 
-    base_url: str = "https://overwatch.blizzard.com/en-us/rates/"
+    base_url: str = "https://overwatch.blizzard.com/en-us/rates/data/"
     backend_url: str = "http://localhost:3000"
     timeout: int = 10
     retry_attempts: int = 3
@@ -31,10 +31,7 @@ class Settings(BaseSettings):
     ]
     regions: List[str] = ["Americas", "Europe", "Asia"]
     platforms: List[str] = ["PC", "Console"]
-    roles: List[str] = ["All"]
     gamemodes: List[str] = ["Quick Play", "Competitive"]
-    # maps: List[str] = ["All"]
-
     maps: List[str] = [
         "All",
         "Antarctic Peninsula",

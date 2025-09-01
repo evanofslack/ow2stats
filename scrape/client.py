@@ -2,7 +2,7 @@ import requests
 from typing import List
 from dataclasses import asdict
 
-from .models import HeroStats
+from .models import HeroStatsUpload
 
 
 class BackendClient:
@@ -14,7 +14,7 @@ class BackendClient:
         self.backend_url = backend_url.rstrip("/")
         self.batch_upload_url = f"{self.backend_url}/api/heroes/batch"
 
-    def upload_stats(self, stats: List[HeroStats]):
+    def upload_stats(self, stats: List[HeroStatsUpload]):
         """Uploads a list of hero statistics to the backend."""
         if not stats:
             print("No stats to upload.")

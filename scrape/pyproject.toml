@@ -1,15 +1,14 @@
 [project]
 name = "scrape"
 version = "0.1.0"
-description = "Add your description here"
+description = "Scrape overwatch hero stats"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "selenium>=4.35.0",
-    "webdriver-manager>=4.0.2",
     "requests>=2.31.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
+    "tqdm>=4.67.1",
 ]
 
 [dependency-groups]
