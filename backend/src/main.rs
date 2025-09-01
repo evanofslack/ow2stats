@@ -1,4 +1,10 @@
-use axum::{response::Json, routing::get, Router};
+use axum::{
+    body::Body,
+    http::Request,
+    middleware::{self, Next},
+    response::{Json, Response},
+    Router,
+};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -39,15 +45,14 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    debug!("Loading config");
     let config = Config::load()?;
-    info!("Loaded config: {:?}", config);
+    debug!("Loaded config: {:?}", config);
 
     let db = Database::new(&config.database_url).await?;
-    info!("Database connection established successfully");
+    info!("Database connection established");
 
     db.migrate().await?;
-    info!("Database migrations completed successfully");
+    info!("Database migrations complete");
 
     let state = AppState {
         db,
@@ -66,20 +71,16 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn create_router(state: AppState) -> Router {
-    Router::new()
-        .route("/health", get(health_check))
-        .nest("/api", routes::api_routes())
-        .layer(CorsLayer::permissive())
-        .layer(TraceLayer::new_for_http())
-        .with_state(state)
+async fn debug_middleware(req: Request<Body>, next: Next) -> Response {
+    println!("Request: {} {}", req.method(), req.uri().path());
+    next.run(req).await
 }
 
-#[instrument]
-async fn health_check() -> Result<Json<Value>, AppError> {
-    Ok(Json(json!({
-        "status": "healthy",
-        "service": "ow2stats-backend",
-        "timestamp": chrono::Utc::now()
-    })))
+fn create_router(state: AppState) -> Router {
+    handlers::heroes::create_router()
+        .merge(handlers::status::create_router())
+        .with_state(state)
+        .layer(middleware::from_fn(debug_middleware))
+        .layer(CorsLayer::permissive())
+        .layer(TraceLayer::new_for_http())
 }

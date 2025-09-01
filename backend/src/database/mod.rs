@@ -18,7 +18,7 @@ impl Database {
             debug!("  Database: {}", url.path().trim_start_matches('/'));
             debug!("  Username: {:?}", url.username());
         }
-        
+
         debug!("Creating connection pool with max_connections=10");
         let pool = PgPoolOptions::new()
             .max_connections(10)
@@ -31,9 +31,7 @@ impl Database {
 
     pub async fn migrate(&self) -> anyhow::Result<()> {
         info!("Running database migrations");
-        debug!("Migration path: ./migrations");
-        debug!("Checking if migrations directory exists");
-        
+
         let migrations_result = sqlx::migrate!("./migrations").run(&self.pool).await;
         match migrations_result {
             Ok(_) => {
@@ -51,3 +49,4 @@ impl Database {
         &self.pool
     }
 }
+

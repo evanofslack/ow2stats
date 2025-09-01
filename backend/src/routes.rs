@@ -1,12 +1,17 @@
-use axum::{routing::{post, get}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 
 use crate::{handlers::heroes, AppState};
 
 pub fn api_routes() -> Router<AppState> {
+    println!("api_routes() called");
     Router::new()
-        .route("/heroes", post(heroes::create_hero))
+        .route("/test", get(|| async { "api routes working" }))
+        .route("/heroes", get(heroes::get_heroes).post(heroes::create_hero))
         .route(
-            "/heroes/:id",
+            "/hero/:id",
             get(heroes::get_hero).delete(heroes::delete_hero),
         )
         .route("/heroes/batch", post(heroes::batch_upload))
