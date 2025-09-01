@@ -26,7 +26,7 @@ services:
       OW2STATS_DATABASE_URL: "postgresql://ow2stats:ow2stats_password@postgres:5432/ow2stats"
       OW2STATS_PORT: 3000
       OW2STATS_LOG_LEVEL: "info"
-      RUST_LOG: "info"
+      RUST_LOG: "debug"
     ports:
       - "3000:3000"
     depends_on:
