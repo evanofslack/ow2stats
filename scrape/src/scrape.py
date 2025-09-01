@@ -100,6 +100,62 @@ class OverwatchScraper:
             self.logger.error(f"Failed to parse API response structure from {url}: {e}")
             return None
 
+    def _get_map_type(self, map: str) -> str:
+        """
+        Maps Overwatch map names to their game mode types.
+        """
+
+        map_types = {
+            # Control maps (7 maps)
+            "busan": "control",
+            "ilios": "control",
+            "lijiang tower": "control",
+            "nepal": "control",
+            "oasis": "control",
+            "antarctic peninsula": "control",
+            "samoa": "control",
+            # Escort maps (8 maps)
+            "circuit royal": "escort",
+            "dorado": "escort",
+            "havana": "escort",
+            "junkertown": "escort",
+            "rialto": "escort",
+            "route 66": "escort",
+            "shambali monastery": "escort",
+            "watchpoint: gibraltar": "escort",
+            "gibraltar": "escort",  # Common abbreviation
+            # Hybrid maps (7 maps)
+            "blizzard world": "hybrid",
+            "eichenwalde": "hybrid",
+            "hollywood": "hybrid",
+            "king's row": "hybrid",
+            "kings row": "hybrid",  # Common variant without apostrophe
+            "midtown": "hybrid",
+            "numbani": "hybrid",
+            "paraíso": "hybrid",
+            "paraiso": "hybrid",  # Without accent
+            # Push maps (4 maps)
+            "colosseo": "push",
+            "esperança": "push",
+            "esperanca": "push",  # Without accent
+            "new queen street": "push",
+            "runasapi": "push",
+            # Flashpoint maps (3 maps)
+            "new junk city": "flashpoint",
+            "suravasa": "flashpoint",
+            "aatlis": "flashpoint",
+            # Clash maps (2 maps)
+            "hanaoka": "clash",
+            "throne of anubis": "clash",
+        }
+
+        normalized_name = map.lower().strip()
+        map_type = map_types.get(normalized_name)
+        if map_type:
+            return map_type
+        else:
+            return ""
+
     def _transform_to_hero_stats(
         self,
         hero_rate: HeroRate,
@@ -110,15 +166,18 @@ class OverwatchScraper:
         tier: str,
     ) -> HeroStatsUpload:
         """Transform Blizzard API data to HeroStats format."""
+        map_type = self._get_map_type(map_name).lower()
         return HeroStatsUpload(
-            hero_id=hero_rate.id,
+            hero_id=hero_rate.id.lower(),
+            hero_class=hero_rate.hero.role.lower(),
             pick_rate=hero_rate.cells.pickrate,
             win_rate=hero_rate.cells.winrate,
-            region=region,
-            platform=platform,
-            gamemode=gamemode,
-            map=map_name,
-            tier=tier,
+            region=region.lower(),
+            platform=platform.lower(),
+            gamemode=gamemode.lower(),
+            map=map_name.lower(),
+            map_type=map_type.lower(),
+            tier=tier.lower(),
         )
 
     def _scrape_stats_page(

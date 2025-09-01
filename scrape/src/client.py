@@ -20,9 +20,10 @@ class BackendClient:
             print("No stats to upload")
             return
 
+        payload = [asdict(stat) for stat in stats]
+
         try:
             # Convert list of dataclasses to a list of dictionaries
-            payload = [asdict(stat) for stat in stats]
             response = requests.post(self.batch_upload_url, json=payload, timeout=15)
             response.raise_for_status()
             print(
@@ -30,5 +31,5 @@ class BackendClient:
             )
         except requests.RequestException as e:
             print(
-                f"An error occurred while uploading stats to the backend, err={e}, url={self.batch_upload_url}"
+                f"An error occurred while uploading stats to the backend, err={e}, url={self.batch_upload_url}, stat={stats[0]}"
             )
