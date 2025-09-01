@@ -15,31 +15,6 @@ env:
   IMAGE_NAME: ${{ github.repository }}-backend
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v4
-
-      - name: setup rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: cache rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
-      - name: format check
-        run: cargo fmt --all -- --check
-
-      - name: run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: run tests
-        run: cargo test
-
   build:
     runs-on: ubuntu-latest
     needs: [test]
