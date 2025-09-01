@@ -2,7 +2,7 @@ use axum::{response::Json, routing::get, Router};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument, warn};
 
 mod config;
 mod database;
@@ -25,19 +25,29 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+    info!("Starting service");
 
-    info!("Starting OW2Stats Backend API Server");
+    match dotenvy::dotenv() {
+        Ok(path) => debug!("Loaded .env from: {:?}", path),
+        Err(e) => warn!("No .env file found or error loading: {}", e),
+    }
 
-    dotenvy::dotenv().ok();
+    debug!("Environment variables:");
+    for (key, value) in std::env::vars() {
+        if key.starts_with("OW2STATS_") {
+            debug!("  {}: {}", key, value);
+        }
+    }
+
+    debug!("Loading config");
     let config = Config::load()?;
     info!("Loaded config: {:?}", config);
-    info!("Configuration loaded successfully");
 
     let db = Database::new(&config.database_url).await?;
-    info!("Database connection established");
+    info!("Database connection established successfully");
 
     db.migrate().await?;
-    info!("Database migrations completed");
+    info!("Database migrations completed successfully");
 
     let state = AppState {
         db,
@@ -50,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Server starting on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    info!("Server ready to accept connections");
     axum::serve(listener, app).await?;
 
     Ok(())

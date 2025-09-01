@@ -29,4 +29,3 @@ impl Config {
         Ok(config)
     }
 }
-
