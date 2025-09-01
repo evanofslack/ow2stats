@@ -10,7 +10,7 @@ import sys
 import requests as rq
 from tqdm import tqdm
 
-from .models import OverwatchStats, HeroStatsUpload, Hero, HeroRate
+from .models import OverwatchStats, HeroStatsUpload, HeroRate
 from .client import BackendClient
 from .config import config
 
@@ -108,11 +108,9 @@ class OverwatchScraper:
         gamemode: str,
         map_name: str,
         tier: str,
-        timestamp: str,
     ) -> HeroStatsUpload:
         """Transform Blizzard API data to HeroStats format."""
         return HeroStatsUpload(
-            hero=hero_rate.hero.name,
             hero_id=hero_rate.id,
             pick_rate=hero_rate.cells.pickrate,
             win_rate=hero_rate.cells.winrate,
@@ -121,7 +119,6 @@ class OverwatchScraper:
             gamemode=gamemode,
             map=map_name,
             tier=tier,
-            timestamp=timestamp,
         )
 
     def _scrape_stats_page(
@@ -148,7 +145,6 @@ class OverwatchScraper:
             return []
 
         stats = []
-        timestamp = datetime.now().isoformat()
 
         for rate in api_response.rates:
             hero_stats = self._transform_to_hero_stats(
@@ -158,7 +154,6 @@ class OverwatchScraper:
                 gamemode,
                 map_name,
                 tier,
-                timestamp,
             )
             stats.append(hero_stats)
 
@@ -227,20 +222,3 @@ class OverwatchScraper:
                 time.sleep(delay)
 
         self.logger.info(f"Scraping completed. Success: {completed}, Failed: {failed}")
-
-
-def main():
-    """Main execution function."""
-    scraper = OverwatchScraper()
-    try:
-        scraper.logger.info("Starting Overwatch statistics scraping")
-        scraper.scrape_all_configurations()
-    except KeyboardInterrupt:
-        scraper.logger.info("Scraping interrupted by user")
-    except Exception as e:
-        scraper.logger.error(f"Scraping failed: {e}")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

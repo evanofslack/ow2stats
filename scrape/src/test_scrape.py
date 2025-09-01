@@ -40,4 +40,3 @@ def test_scrape_single_page(scraper: OverwatchScraper, mocker):
     assert first_stat.region == region
     assert first_stat.gamemode == gamemode
     assert first_stat.map == map_name
-    assert first_stat.timestamp is not None

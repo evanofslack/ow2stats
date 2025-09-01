@@ -90,7 +90,6 @@ class HeroStatsUpload:
     """Data model to send to backend"""
 
     hero_id: str
-    hero: str
     pick_rate: Optional[float]
     win_rate: Optional[float]
     region: str
@@ -98,4 +97,3 @@ class HeroStatsUpload:
     gamemode: str
     map: str
     tier: str
-    timestamp: str

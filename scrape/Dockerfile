@@ -10,6 +10,6 @@ RUN uv sync
 
 COPY . .
 
-CMD ["uv", "run", "python", "-u", "-m", "scrape.py"]
+CMD ["uv", "run", "python", "-u", "-m", "src.main"]
 
 
