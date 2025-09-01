@@ -1,21 +1,21 @@
 use axum::{
-    extract::{Json, Path, Query, State},
+    extract::{rejection::JsonRejection, Json, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     response::Json as JsonResponse,
     routing::{get, post},
     Router,
 };
+use serde::Deserialize;
 use serde_json::{json, Value};
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use crate::{
-    database::models::{CreateHeroStats, HeroStats},
+    database::models::{CreateHeroStats, HeroClass, HeroStats, MapType},
     error::AppError,
     AppState,
 };
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
 use sqlx::{Postgres, QueryBuilder};
 use std::fmt;
 
@@ -28,12 +28,15 @@ pub fn create_router() -> Router<AppState> {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
 pub struct HeroQueryParams {
     hero_id: Option<String>,
+    hero_class: Option<HeroClass>,
     region: Option<String>,
     platform: Option<String>,
     gamemode: Option<String>,
     map: Option<String>,
+    map_type: Option<MapType>,
     tier: Option<String>,
     start_time: Option<DateTime<Utc>>,
     end_time: Option<DateTime<Utc>>,
@@ -94,6 +97,16 @@ pub async fn get_heroes(
         qb.push("hero_id = ").push_bind(hero_id);
     }
 
+    if let Some(hero_class) = params.hero_class {
+        if !has_where {
+            qb.push(" WHERE ");
+            has_where = true;
+        } else {
+            qb.push(" AND ");
+        }
+        qb.push("hero_class = ").push_bind(hero_class);
+    }
+
     if let Some(region) = params.region {
         if !has_where {
             qb.push(" WHERE ");
@@ -132,6 +145,16 @@ pub async fn get_heroes(
             qb.push(" AND ");
         }
         qb.push("map = ").push_bind(map);
+    }
+
+    if let Some(map_type) = params.map_type {
+        if !has_where {
+            qb.push(" WHERE ");
+            has_where = true;
+        } else {
+            qb.push(" AND ");
+        }
+        qb.push("map_type = ").push_bind(map_type);
     }
 
     if let Some(tier) = params.tier {
@@ -208,18 +231,20 @@ pub async fn create_hero(
 
     let hero = sqlx::query_as::<_, HeroStats>(
         r#"
-        INSERT INTO hero_stats (hero_id, pick_rate, win_rate, region, platform, gamemode, map, tier, inserted_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+        INSERT INTO hero_stats (hero_id, hero_class, pick_rate, win_rate, region, platform, gamemode, map, map_type, tier, inserted_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
         RETURNING *
         "#,
     )
     .bind(&hero_data.hero_id)
+    .bind(&hero_data.hero_class)
     .bind(hero_data.pick_rate)
     .bind(hero_data.win_rate)
     .bind(&hero_data.region)
     .bind(&hero_data.platform)
     .bind(&hero_data.gamemode)
     .bind(&hero_data.map)
+    .bind(&hero_data.map_type)
     .bind(&hero_data.tier)
     .fetch_one(state.db.pool())
     .await?;
@@ -251,9 +276,17 @@ pub async fn delete_hero(
 #[instrument(skip(state))]
 pub async fn batch_upload(
     State(state): State<AppState>,
-    Json(heroes_data): Json<Vec<CreateHeroStats>>,
+    payload: Result<Json<Vec<CreateHeroStats>>, JsonRejection>,
 ) -> Result<JsonResponse<Value>, AppError> {
-    info!("Batch uploading {} heroes", heroes_data.len());
+    let Json(heroes_data) = match payload {
+        Ok(json) => json,
+        Err(rejection) => {
+            error!("Json parse failed: {:?}", rejection);
+            return Err(AppError::Validation {
+                message: "Json parse failed".to_string(),
+            });
+        }
+    };
 
     if heroes_data.is_empty() {
         return Err(AppError::Validation {
@@ -268,8 +301,8 @@ pub async fn batch_upload(
     for (index, hero_data) in heroes_data.iter().enumerate() {
         let result = sqlx::query(
             r#"
-            INSERT INTO hero_stats (hero_id, pick_rate, win_rate, region, platform, gamemode, map, tier, inserted_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+            INSERT INTO hero_stats (hero_id, hero_class, pick_rate, win_rate, region, platform, gamemode, map, map_type, tier, inserted_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
             ON CONFLICT (hero_id, region, platform, gamemode, map, tier, inserted_at) 
             DO UPDATE SET 
                 pick_rate = EXCLUDED.pick_rate,
@@ -278,12 +311,14 @@ pub async fn batch_upload(
             "#,
         )
         .bind(&hero_data.hero_id)
+        .bind(&hero_data.hero_class)
         .bind(hero_data.pick_rate)
         .bind(hero_data.win_rate)
         .bind(&hero_data.region)
         .bind(&hero_data.platform)
         .bind(&hero_data.gamemode)
         .bind(&hero_data.map)
+        .bind(&hero_data.map_type)
         .bind(&hero_data.tier)
         .execute(&mut *transaction)
         .await;

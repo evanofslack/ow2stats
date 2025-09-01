@@ -1,24 +1,15 @@
-use axum::{
-    body::Body,
-    http::Request,
-    middleware::{self, Next},
-    response::{Json, Response},
-    Router,
-};
-use serde_json::{json, Value};
+use axum::Router;
 use std::net::SocketAddr;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, warn};
 
 mod config;
 mod database;
 mod error;
 mod handlers;
-mod routes;
 
 use config::Config;
 use database::Database;
-use error::AppError;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -71,16 +62,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn debug_middleware(req: Request<Body>, next: Next) -> Response {
-    println!("Request: {} {}", req.method(), req.uri().path());
-    next.run(req).await
-}
-
 fn create_router(state: AppState) -> Router {
     handlers::heroes::create_router()
         .merge(handlers::status::create_router())
         .with_state(state)
-        .layer(middleware::from_fn(debug_middleware))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
 }
