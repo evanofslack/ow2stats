@@ -1,7 +1,6 @@
 import logging
 import json
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 import random
@@ -19,7 +18,7 @@ class OverwatchScraper:
     def __init__(self):
         self.config = config
         self.logger = self._setup_logging()
-        self.client = BackendClient(self.config.backend_url)
+        self.client = BackendClient(self.logger, self.config.backend_url)
         self.cache_dir = Path("cache")
         self.cache_dir.mkdir(exist_ok=True)
 
@@ -146,7 +145,7 @@ class OverwatchScraper:
             "aatlis": "flashpoint",
             # Clash maps (2 maps)
             "hanaoka": "clash",
-            "throne of anubis": "clash",
+            "temple of anubis": "clash",
         }
 
         normalized_name = map.lower().strip()
