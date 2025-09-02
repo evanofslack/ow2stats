@@ -215,7 +215,7 @@ class OverwatchScraper:
             )
             stats.append(hero_stats)
 
-        self.logger.info(f"Extracted {len(stats)} hero stats")
+        self.logger.debug(f"Extracted {len(stats)} hero stats")
         return stats
 
     def _save_stats(self, stats_list: List[HeroStatsUpload]) -> None:
@@ -253,7 +253,7 @@ class OverwatchScraper:
                                 }
                             )
 
-        self.logger.info(f"Starting scrape for {len(configurations)} configurations")
+        self.logger.info(f"Start scrape for {len(configurations)} configurations")
 
         completed = 0
         failed = 0
@@ -268,7 +268,7 @@ class OverwatchScraper:
 
                 except Exception as e:
                     self.logger.warning(
-                        f"Attempt {attempt + 1} failed for {config_dict}: {e}"
+                        f"Attempt {attempt + 1} fail for {config_dict}: {e}"
                     )
                     if attempt < self.config.retry_attempts - 1:
                         time.sleep(self.config.retry_delay)
@@ -279,4 +279,4 @@ class OverwatchScraper:
                 delay = random.uniform(*self.config.rate_limit_delay)
                 time.sleep(delay)
 
-        self.logger.info(f"Scraping completed. Success: {completed}, Failed: {failed}")
+        self.logger.info(f"Scraping complete, success={completed}, failed={failed}")
